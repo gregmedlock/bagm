@@ -13,30 +13,31 @@ sampleInfo = read.table('/home/glm5uh/asf_characterization/Metabolomics/NMR_Inte
 names(sampleInfo) = c("Grower","Medium","Rep","Round")
 sampleInfo = sampleInfo[-253,]  # Last sample in "sample_info_7Oct15.tsv" is a blank buffer, so no need to keep it
 
-### center all samples by the media mean
+### center all samples by the mean of the media in which they were grown
 RI_media_centered = data.frame(matrix(ncol = 86, nrow = 0))
 media = c(0,356,360,361,492,500,502,519)
-species = c(356,360,361,492,500,502,519)
-blankMedia = relativeIntensities[(sampleInfo$Grower==0 & sampleInfo$Medium==0),-1]
-spentMedia = relativeIntensities[(sampleInfo$Grower>0 | sampleInfo$Medium>0),-1]
-spentMediaInfo = sampleInfo[(sampleInfo$Grower>0 | sampleInfo$Medium>0),]
-FMmeans = colMeans(blankMedia)
-
-# center each sample by the media average
-for(r in 1:nrow(spentMedia))
+species = as.character(c(356,360,361,492,500,502,519))
+relativeIntensities.centered = relativeIntensities
+for (s in species)
 {
-  # Rename 
-  tmpName = paste0(spentMediaInfo$Grower[r],'in',spentMediaInfo$Medium[r])
+  # get the metabolite means for media produced by this species
+  grower_means = apply(spentMedia[spentMediaInfo$Grower==s & spentMediaInfo$Medium=="0",],2,mean)
   
-  # Calculate centered value
-  tmp_center = spentMedia[r,] - FMmeans
-  tmpdf = data.frame(matrix(ncol = 86, nrow = 1))
-  tmpdf[1,2:86] = tmp_center
-  tmpdf[1,1] = tmpName
-  RI_media_centered = rbind(RI_media_centered,tmpdf)
+  # center samples from the normalizing condition itself
+  #-c(1) to get rid of sample label
+  relativeIntensities.centered[sampleInfo$Grower==s & sampleInfo$Medium=='0',-c(1)] = 
+          relativeIntensities.centered[sampleInfo$Grower==s & sampleInfo$Medium=='0',-c(1)] - grower_means 
+  
+  # center the intensities for any sample that was grown in this media
+  relativeIntensities.centered[sampleInfo$Medium==s,-c(1)] = relativeIntensities.centered[sampleInfo$Medium==s,-c(1)] - grower_means
 }
-names(RI_media_centered) = c('Name',as.character(peakInfo$Name))
+  
+RI_media_centered = relativeIntensities.centered
+colnames(RI_media_centered) = c('Name',as.character(peakInfo$Name))
 rowNames_RI_media_centered = RI_media_centered[,1]
+
+#rename RI sample labels to match the growth curves
+RI_media_centered$Name = paste0(sampleInfo$Grower,'in',sampleInfo$Medium,"_",sampleInfo$Rep)
 
 ### filter out the samples that didn't contain ASF519, the only strain we'll model for now
 RI_media_centered_519 = RI_media_centered[startsWith(RI_media_centered$Name,'519'),]
@@ -49,10 +50,12 @@ correctTime <- function(od,t,timeRef)
   if (length(t) != length(timeRef))
   {
     fn = splinefun(t, y = od, method = "natural", ties = mean)
-    od2 = fn(timeRef)
-    od2[od2<0.001] = 0.001
+    interp_od = fn(timeRef)
+    interp_od[interp_od<0.001] = 0.001
   }
-  return(od2)
+  else
+    interp_od = od
+  return(interp_od)
 }
 
 # This function collects the 4 growth curves collected for each condition,
@@ -127,29 +130,55 @@ for (condition in paste0("ASF519in",c("356","360","361","492","500","502","519")
 
 library(zoo)
 
-auc_inhibition_mat = matrix(0,ncol=7,nrow=7)
-for(i in asfIDs)
-{
-  fileName = paste0("/home/glm5uh/asf_characterization/SpentMediaGrowthCurveData/ASF",i,"in",0,".tsv")
-  curve0_df = averageGrowthCurve(fileName)
-  auc0 = sum(diff(curve0_df$time)*rollmean(abs(curve0_df$ODave-0.001),2))
-  
-  for(j in asfIDs)
-  {
-    fileName = paste0("SpentMediaGrowthCurveData\\ASF",i,"in",j,".tsv")
-    curve_df= averageGrowthCurve(fileName)
-    aucj = sum(diff(curve_df$time)*rollmean(abs(curve_df$ODave-0.001),2))
-    inhibition = -(auc0-aucj)/auc0
-    auc_inhibition_mat[match(i,asfIDs),match(j,asfIDs)] = inhibition
-    
-    # Visualize, just for QC
-    print(paste(fileName,": ",inhibition))
-    plot(curve0_df$time,curve0_df$ODave,col='red',type='l')
-    lines(curve_df$time,curve_df$ODave,col='blue',type='l')
-    
-  }
-}
-colnames(auc_inhibition_mat) = paste0("Spent",asfIDs)
-rownames(auc_inhibition_mat) = paste0("ASF",asfIDs)
-write.table(auc_inhibition_mat, file = "auc_inhibitions_all_pairs.tsv", sep = "\t", quote=FALSE, row.names = TRUE, col.names = TRUE)
+#calculate AUCs
+AUCs = apply(ODs,2,function(x) sum(diff(timeRef)*rollmean(abs(x-0.001),2)))
 
+# Rename rownames in metabolite DF to match AUCs
+for (condition in unique(RI_media_centered_519$Name))
+{
+  RI_media_centered_519[RI_media_centered_519$Name == condition,]$Name = paste0("ASF",condition) 
+}
+
+# get the top 10 most abundant metabolites based on average change from all conditions
+
+top10 = names(tail(sort(abs(apply(RI_media_centered_519[,-1],2,sd))),15))
+data = RI_media_centered_519
+# Merge to add the AUC value
+data = cbind(data,AUCs[data$Name])
+colnames(data)[length(colnames(data))] = "AUC"
+# remove the sample label column
+data = data[,-1]
+# Scale the data. Min/max scaling seems to do the trick, since it preserves information about metabolite consumption/production.
+data = apply(data,2,function(x) (x)/max(abs(x)))
+
+# get the top 10 most variable metabolites
+top10 = names(tail(sort(apply(data[,!(colnames(data) %in% c("AUC",colnames(data)[startsWith(colnames(data),"Unknown")]))],2,sd)),20))
+
+# select only the top 10 metabolites
+data = data[,c(top10,"AUC")]
+
+
+# shortcut: lets use lm()
+data = data.frame(data)
+mod = lm(AUC ~ ., data=data)
+
+# inspect the fit
+plot(data$AUC,predict.lm(mod,data))
+
+# actually use a bayesian model now
+library(rethinking)
+
+
+# declare the model
+metGauss <- map(
+  alist(
+    AUC ~ dnorm(mu, sigma),
+    mu <- a+bR*Leucine+bA*Alanine+bG*Unknown39,
+    a ~ dnorm(-10,10),
+    bR ~ dnorm(-1,1),
+    bA ~ dnorm(-1,1),
+    bG ~ dnorm(-1,1),
+    sigma ~ dunif(0,10)
+  ) , 
+  data = data
+)
