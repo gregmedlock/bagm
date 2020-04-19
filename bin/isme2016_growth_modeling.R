@@ -276,6 +276,7 @@ for (i in 1:nrow(data_519))
 {
   lines( rep(data_519$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
 }
+par(mar=c(6.5,6.5,4,2))
 dev.off()
 
 # generate counterfactual plots for all metabolites from the 519 model
@@ -359,6 +360,7 @@ for (i in 1:nrow(data_356))
 {
   lines( rep(data_356$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
 }
+par(mar=c(6.5,6.5,4,2))
 dev.off()
 
 for (metname in top10_356) {
