@@ -276,7 +276,7 @@ for (i in 1:nrow(data_519))
 }
 
 # generate counterfactual plots for all metabolites from the 519 model
-single_counterfact_plot <- function(metname, outcome, d, lenpred) {
+single_counterfact_plot <- function(mapmodel, metname, outcome, d, lenpred) {
   # get the mean metabolite values for all metabolites other than the target metabolite
   met.avgs = apply(d[,!colnames(d) %in% c(outcome,"Name",metname)],2,mean)
   # generate a range of values for the target metabolite, which we'd like to predict the outcome over
@@ -286,12 +286,12 @@ single_counterfact_plot <- function(metname, outcome, d, lenpred) {
   colnames(pred.data) = c(metname,colnames(d)[!colnames(d) %in% c(outcome,"Name",metname)])
   
   # predict the mean and PI (credible interval, default = 0.89) of the coefficient
-  mu = link(metGauss, data=pred.data)
+  mu = link(mapmodel, data=pred.data)
   mu.mean = apply(mu,2,mean)
   mu.PI = apply(mu,2,PI)
   
   # sample from the posterior distribution to generate a distribution of real samples at each value of the target met
-  R.sim = sim(metGauss, data=pred.data, n=1e4)
+  R.sim = sim(mapmodel, data=pred.data, n=1e4)
   R.PI = apply(R.sim, 2, PI)
   
   plot(d[,metname],d[,outcome] , pch = 16, xlab="", ylab="", 
@@ -307,9 +307,59 @@ single_counterfact_plot <- function(metname, outcome, d, lenpred) {
 }
 
 for (metname in top10_519) {
-  png(paste0('/home/glm5uh/bagm/results/counterfactual_AUC_',metname,".png"))
-  single_counterfact_plot(metname,"AUC",data_519,50)
+  png(paste0('/home/glm5uh/bagm/results/ASF519_counterfactual_AUC_',metname,".png"))
+  single_counterfact_plot(metGauss, metname,"AUC",data_519,50)
   dev.off()
 }
 
+# Repeat for the ASF356 model
+
+# declare the model
+predictors <- reformulate(termlabels = c("a",paste(top10_356,"*",paste0("r",top10_356))), response = mu)[[3]] # [[3]] to get the RHS only
+# construct the prior for each coefficient in the predictor formula
+priors = vector('list',length(top10_356)) #preallocate the list for speed
+for (i in 1:length(top10_356))
+{
+  prior = reformulate(termlabels = "dnorm(-1,1)", response = paste0("r",top10_356[i]))
+  priors[[i]] <- prior
+}
+
+# Give up on handling formulas and just copy/paste the output from predictors into the assignment of mu.
+coef_priors = lapply(paste0("r",top10_356),function(x) reformulate(termlabels = "dnorm(-1,1)", response = x))
+metGauss <- map(
+  append(alist(
+    AUC ~ dnorm(mu, sigma),
+    mu <- a + Unknown12 * rUnknown12 + Unknown68 * rUnknown68 + Betaine * 
+      rBetaine + Unknown58 * rUnknown58 + Unknown65 * rUnknown65 + 
+      Unknown52 * rUnknown52 + Glycine * rGlycine + Unknown14 * 
+      rUnknown14 + Valine * rValine + Lactate * rLactate + X3.hydroxybutyrate * 
+      rX3.hydroxybutyrate + Unknown50 * rUnknown50 + Unknown38 * 
+      rUnknown38 + Succinate * rSuccinate + Formate * rFormate + 
+      Tyrosine * rTyrosine + Unknown34 * rUnknown34 + Unknown19 * 
+      rUnknown19 + Unknown33 * rUnknown33 + Unknown26 * rUnknown26,
+    a ~ dnorm(-10,10),
+    sigma ~ dunif(0,10)
+  ), priors) , 
+  data = data_356, debug=TRUE, verbose = TRUE
+)
+
+mu = link(metGauss)
+mu.mean = apply(mu,2,mean)
+mu.PI = apply(mu,2,PI)
+auc.sim = sim(metGauss,n=1e4)
+auc.PI = apply(auc.sim, 2 , PI)
+
+plot(mu.mean ~ data_356$AUC, col=rangi2, ylim=range(mu.PI),
+     xlab='Observed AUC', ylab='Predicted AUC')
+abline(a=0,b=1,lty=2)
+for (i in 1:nrow(data_519))
+{
+  lines( rep(data_356$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
+}
+
+for (metname in top10_356) {
+  png(paste0('/home/glm5uh/bagm/results/ASF356_counterfactual_AUC_',metname,".png"))
+  single_counterfact_plot(metGauss, metname,"AUC",data_356,50)
+  dev.off()
+}
 
