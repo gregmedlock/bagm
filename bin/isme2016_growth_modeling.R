@@ -274,3 +274,41 @@ for (i in 1:nrow(data_519))
 {
   lines( rep(data_519$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
 }
+
+# generate counterfactual plots for all metabolites from the 519 model
+single_counterfact_plot <- function(metname, outcome, d, lenpred) {
+  # get the mean metabolite values for all metabolites other than the target metabolite
+  met.avgs = apply(d[,!colnames(d) %in% c(outcome,"Name",metname)],2,mean)
+  # generate a range of values for the target metabolite, which we'd like to predict the outcome over
+  targetmet = seq(from=-1, to=1, length.out=lenpred)
+  met.avgs = do.call("rbind", replicate(lenpred, met.avgs, simplify = FALSE)) # match dimensions of the target variable
+  pred.data = data.frame(targetmet.simulated=targetmet, nontarget.mets=met.avgs)
+  colnames(pred.data) = c(metname,colnames(d)[!colnames(d) %in% c(outcome,"Name",metname)])
+  
+  # predict the mean and PI (credible interval, default = 0.89) of the coefficient
+  mu = link(metGauss, data=pred.data)
+  mu.mean = apply(mu,2,mean)
+  mu.PI = apply(mu,2,PI)
+  
+  # sample from the posterior distribution to generate a distribution of real samples at each value of the target met
+  R.sim = sim(metGauss, data=pred.data, n=1e4)
+  R.PI = apply(R.sim, 2, PI)
+  
+  plot(d[,metname],d[,outcome] , pch = 16, xlab="", ylab="", 
+                xlim=c(min(d[,metname]),max(d[,metname])),
+                ylim=c(min(d[,outcome]),max(d[,outcome])))
+  lines(targetmet, mu.mean)
+  shade(mu.PI, targetmet)
+  shade(R.PI, targetmet)
+  #axis(2,las=2) # rotate y axis tick labels
+  mtext(side=1, line=2, outcome, cex=2)
+  mtext(side=2, line=3, paste0("Change in ",metname), cex=2)
+}
+
+for (metname in top10_519) {
+  png(paste0('/home/glm5uh/bagm/results/counterfactual_AUC_',metname,".png"))
+  single_counterfact_plot(metname,"AUC",data_519,50)
+  dev.off()
+}
+
+
