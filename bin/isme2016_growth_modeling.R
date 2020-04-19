@@ -301,8 +301,9 @@ single_counterfact_plot <- function(metname, outcome, d, lenpred) {
   shade(mu.PI, targetmet)
   shade(R.PI, targetmet)
   #axis(2,las=2) # rotate y axis tick labels
-  mtext(side=1, line=2, outcome, cex=2)
-  mtext(side=2, line=3, paste0("Change in ",metname), cex=2)
+  mtext(side=2, line=2, outcome, cex=2)
+  mtext(side=1, line=3, paste0("Change in ",metname), cex=2)
+  par(mgp=c(10,1,0),mar=c(6.5,6.5,4,2), cex.lab=1.5)
 }
 
 for (metname in top10_519) {
