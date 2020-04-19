@@ -221,6 +221,8 @@ mod_519 = lm(AUC ~ . - Name, data=data_519)
 # inspect the fit
 plot(data_519$AUC,predict.lm(mod_519,data_519))
 
+
+
 mod_519_max = lm(maxOD ~ . - Name, data=datamax_519)
 # inspect the fit
 plot(datamax_519$maxOD,predict.lm(mod_519_max,datamax_519))
@@ -267,13 +269,14 @@ mu.PI = apply(mu,2,PI)
 auc.sim = sim(metGauss,n=1e4)
 auc.PI = apply(auc.sim, 2 , PI)
 
-plot(mu.mean ~ data_519$AUC, col=rangi2, ylim=range(mu.PI),
-     xlab='Observed AUC', ylab='Predicted AUC')
+png('/home/glm5uh/bagm/results/ASF519_predicted_AUC.png')
+plot(mu.mean ~ data_519$AUC, col="black", ylim=range(mu.PI),xlab='Observed AUC', ylab='Predicted AUC',main="ASF519 Growth Model", cex.main=2,cex.lab=2,cex.axis=2,pch=16)
 abline(a=0,b=1,lty=2)
 for (i in 1:nrow(data_519))
 {
   lines( rep(data_519$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
 }
+dev.off()
 
 # generate counterfactual plots for all metabolites from the 519 model
 single_counterfact_plot <- function(mapmodel, metname, outcome, d, lenpred) {
@@ -288,11 +291,11 @@ single_counterfact_plot <- function(mapmodel, metname, outcome, d, lenpred) {
   # predict the mean and PI (credible interval, default = 0.89) of the coefficient
   mu = link(mapmodel, data=pred.data)
   mu.mean = apply(mu,2,mean)
-  mu.PI = apply(mu,2,PI)
+  mu.PI = apply(mu,2,HPDI)
   
   # sample from the posterior distribution to generate a distribution of real samples at each value of the target met
   R.sim = sim(mapmodel, data=pred.data, n=1e4)
-  R.PI = apply(R.sim, 2, PI)
+  R.PI = apply(R.sim, 2, HPDI)
   
   plot(d[,metname],d[,outcome] , pch = 16, xlab="", ylab="", 
                 xlim=c(min(d[,metname]),max(d[,metname])),
@@ -308,7 +311,7 @@ single_counterfact_plot <- function(mapmodel, metname, outcome, d, lenpred) {
 
 for (metname in top10_519) {
   png(paste0('/home/glm5uh/bagm/results/ASF519_counterfactual_AUC_',metname,".png"))
-  single_counterfact_plot(metGauss, metname,"AUC",data_519,50)
+  single_counterfact_plot(metGauss, metname,"AUC",data_519,100)
   dev.off()
 }
 
@@ -349,13 +352,14 @@ mu.PI = apply(mu,2,PI)
 auc.sim = sim(metGauss,n=1e4)
 auc.PI = apply(auc.sim, 2 , PI)
 
-plot(mu.mean ~ data_356$AUC, col=rangi2, ylim=range(mu.PI),
-     xlab='Observed AUC', ylab='Predicted AUC')
+png('/home/glm5uh/bagm/results/ASF356_predicted_AUC.png')
+plot(mu.mean ~ data_356$AUC, col="black", ylim=range(mu.PI),xlab='Observed AUC', ylab='Predicted AUC',main="ASF356 Growth Model", cex.main=2,cex.lab=2,cex.axis=2,pch=16)
 abline(a=0,b=1,lty=2)
-for (i in 1:nrow(data_519))
+for (i in 1:nrow(data_356))
 {
   lines( rep(data_356$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
 }
+dev.off()
 
 for (metname in top10_356) {
   png(paste0('/home/glm5uh/bagm/results/ASF356_counterfactual_AUC_',metname,".png"))
