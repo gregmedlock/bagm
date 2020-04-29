@@ -270,13 +270,14 @@ auc.sim = sim(metGauss,n=1e4)
 auc.PI = apply(auc.sim, 2 , PI)
 
 png('/home/glm5uh/bagm/results/ASF519_predicted_AUC.png')
-plot(mu.mean ~ data_519$AUC, col="black", ylim=range(mu.PI),xlab='Observed AUC', ylab='Predicted AUC',main="ASF519 Growth Model", cex.main=2,cex.lab=2,cex.axis=2,pch=16)
+par(mar=c(7,8.5,4,2)) # adjust margins so axis labels don't get cut off
+plot(mu.mean ~ data_519$AUC, col="black", ylim=range(mu.PI),xlab='Observed AUC', ylab='Predicted AUC',main="ASF519 Growth Model", cex.main=2,cex.lab=2,cex.axis=2,pch=16,family="A")
 abline(a=0,b=1,lty=2)
 for (i in 1:nrow(data_519))
 {
   lines( rep(data_519$AUC[i],2), c(mu.PI[1,i],mu.PI[2,i]),col=rangi2)
 }
-par(mar=c(6.5,6.5,4,2))
+
 dev.off()
 
 # generate counterfactual plots for all metabolites from the 519 model
@@ -298,16 +299,19 @@ single_counterfact_plot <- function(mapmodel, metname, outcome, d, lenpred) {
   R.sim = sim(mapmodel, data=pred.data, n=1e4)
   R.PI = apply(R.sim, 2, HPDI)
   
+  par(mgp=c(6,1,0),mar=c(6,6,4,2), cex.lab=2, cex.axis=2)
   plot(d[,metname],d[,outcome] , pch = 16, xlab="", ylab="", 
                 xlim=c(min(d[,metname]),max(d[,metname])),
-                ylim=c(min(d[,outcome]),max(d[,outcome])))
+                ylim=c(min(d[,outcome]),max(d[,outcome])),family="A")
   lines(targetmet, mu.mean)
   shade(mu.PI, targetmet)
   shade(R.PI, targetmet)
   #axis(2,las=2) # rotate y axis tick labels
-  mtext(side=2, line=2, outcome, cex=2)
-  mtext(side=1, line=3, paste0("Change in ",metname), cex=2)
-  par(mgp=c(10,1,0),mar=c(6.5,6.5,4,2), cex.lab=1.5)
+  mtext(side=2, line=3, paste0(outcome, " (z-score)"), cex=3)
+  mtext(side=1, line=3, paste0("Change in ",metname), cex=3)
+  #axis(1,cex.axis=1.5)
+  
+  
 }
 
 for (metname in top10_519) {
@@ -354,7 +358,8 @@ auc.sim = sim(metGauss,n=1e4)
 auc.PI = apply(auc.sim, 2 , PI)
 
 png('/home/glm5uh/bagm/results/ASF356_predicted_AUC.png')
-plot(mu.mean ~ data_356$AUC, col="black", ylim=range(mu.PI),xlab='Observed AUC', ylab='Predicted AUC',main="ASF356 Growth Model", cex.main=2,cex.lab=2,cex.axis=2,pch=16)
+par(mar=c(7,8.5,4,2)) # adjust margins so axis labels don't get cut off
+plot(mu.mean ~ data_356$AUC, col="black", ylim=range(mu.PI),xlab='Observed AUC', ylab='Predicted AUC',main="ASF356 Growth Model", cex.main=2,cex.lab=2,cex.axis=2,pch=16,family="A")
 abline(a=0,b=1,lty=2)
 for (i in 1:nrow(data_356))
 {
